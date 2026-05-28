@@ -2,16 +2,18 @@ package com.negzaoui.stuffing.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.hibernate.annotations.CreationTimestamp;
 
-import java.util.Collection;
-import java.util.List;
+import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/**
+ * Entité User.
+ * L'authentification est déléguée à Keycloak.
+ * Cette entité sert uniquement de référence locale (profil, assignments, etc.).
+ */
 @Getter
 @Setter
 @Builder
@@ -20,7 +22,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(hidden = true)
 @Entity
 @Table(name = "users")
-public class User implements UserDetails {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,59 +36,40 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /**
+     * Email personnel du collaborateur (fourni lors de la demande d'accès).
+     * Sert à envoyer le mail de bienvenue avec les identifiants pro.
+     */
+    @Column
+    private String personalEmail;
+
     @JsonIgnore
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String password;
+
+    /**
+     * ID de l'utilisateur dans Keycloak (UUID retourné lors de la création).
+     * Permet de retrouver / modifier / supprimer le user dans Keycloak.
+     */
+    @Column(unique = true)
+    private String keycloakId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
     private Role role = Role.COLLABORATEUR;
 
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean active = true;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false, columnDefinition = "timestamp default now()")
+    private LocalDateTime createdAt;
+
+    private LocalDateTime lastLogin;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
-    @Schema(hidden = true)
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
-    }
-
-
-    @Schema(hidden = true)
-    @Override
-    public String getPassword() {
-        return password;
-    }
-
-    @Schema(hidden = true)
-    @Override
-    public String getUsername() {
-
-        return email;
-    }
-
-    @Schema(hidden = true)
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Schema(hidden = true)
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Schema(hidden = true)
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Schema(hidden = true)
-    @Override
-    public boolean isEnabled() {
-        return true;
-    }
-
-
+    private EmployeeProfile profile;
 }

@@ -2,7 +2,7 @@ package com.negzaoui.stuffing.controller;
 
 import com.negzaoui.stuffing.entity.Notification;
 import com.negzaoui.stuffing.entity.User;
-import com.negzaoui.stuffing.repository.UserRepository;
+import com.negzaoui.stuffing.security.KeycloakHelper;
 import com.negzaoui.stuffing.service.NotificationService;
 import com.negzaoui.stuffing.dto.MessageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,26 +21,26 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationService notificationService;
-    private final UserRepository userRepository;
+    private final KeycloakHelper keycloakHelper;
 
     @Operation(summary = "Notifications non lues de l'utilisateur connecté")
     @GetMapping("/unread")
     public ResponseEntity<List<Notification>> getUnreadNotifications(Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = keycloakHelper.getCurrentUser(authentication);
         return ResponseEntity.ok(notificationService.getUnreadNotifications(currentUser));
     }
 
     @Operation(summary = "Toutes les notifications de l'utilisateur connecté")
     @GetMapping
     public ResponseEntity<List<Notification>> getAllNotifications(Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = keycloakHelper.getCurrentUser(authentication);
         return ResponseEntity.ok(notificationService.getAllNotifications(currentUser));
     }
 
     @Operation(summary = "Nombre de notifications non lues")
     @GetMapping("/count")
     public ResponseEntity<Long> countUnread(Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = keycloakHelper.getCurrentUser(authentication);
         return ResponseEntity.ok(notificationService.countUnread(currentUser));
     }
 
@@ -50,7 +50,7 @@ public class NotificationController {
             @PathVariable Long id,
             Authentication authentication
     ) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = keycloakHelper.getCurrentUser(authentication);
         notificationService.markAsRead(id, currentUser);
         return ResponseEntity.ok(MessageResponse.builder().message("Notification marquée comme lue").build());
     }
@@ -58,21 +58,8 @@ public class NotificationController {
     @Operation(summary = "Marquer toutes les notifications comme lues")
     @PutMapping("/read-all")
     public ResponseEntity<MessageResponse> markAllAsRead(Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
+        User currentUser = keycloakHelper.getCurrentUser(authentication);
         notificationService.markAllAsRead(currentUser);
         return ResponseEntity.ok(MessageResponse.builder().message("Toutes les notifications marquées comme lues").build());
-    }
-
-    // ─── Helper ──────────────────────────────────────────────
-    private User getCurrentUser(Authentication authentication) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("Utilisateur non authentifié");
-        }
-
-        String email = authentication.getName();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Utilisateur introuvable: " + email));
     }
 }

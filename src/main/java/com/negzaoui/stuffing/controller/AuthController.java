@@ -2,7 +2,8 @@ package com.negzaoui.stuffing.controller;
 
 import com.negzaoui.stuffing.dto.*;
 import com.negzaoui.stuffing.dto.auth.*;
-import com.negzaoui.stuffing.service.AuthenticationService;
+import com.negzaoui.stuffing.entity.User;
+import com.negzaoui.stuffing.security.KeycloakHelper;
 import com.negzaoui.stuffing.service.PasswordResetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -19,37 +21,29 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthenticationService authenticationService;
     private final PasswordResetService passwordResetService;
+    private final KeycloakHelper keycloakHelper;
+
+    // ─── /me : retourne les infos de l'utilisateur connecté (depuis le token Keycloak) ───
 
     @Operation(
-            summary = "Register",
-            description = "(Optionnel) Crée un compte utilisateur. Pour une app interne, préférez /api/public/account-requests (demande traitée par l'Admin/Delivery Manager)."
+            summary = "Informations utilisateur connecté",
+            description = "Retourne les informations de l'utilisateur à partir du token Keycloak. Remplace l'ancien /login qui retournait un token."
     )
-    @ApiResponse(responseCode = "200", description = "Inscription réussie",
+    @ApiResponse(responseCode = "200", description = "Utilisateur trouvé",
             content = @Content(schema = @Schema(implementation = AuthenticationResponse.class)))
-    @ApiResponse(responseCode = "409", description = "Email déjà utilisé")
-    @PostMapping("/register")
-    public ResponseEntity<AuthenticationResponse> register(
-            @Valid @RequestBody RegisterRequest request
-    ) {
-        return ResponseEntity.ok(authenticationService.register(request));
+    @GetMapping("/me")
+    public ResponseEntity<AuthenticationResponse> me(Authentication authentication) {
+        User user = keycloakHelper.getCurrentUser(authentication);
+        return ResponseEntity.ok(AuthenticationResponse.builder()
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole().name())
+                .build());
     }
 
-    @Operation(
-            summary = "Connexion utilisateur",
-            description = "Authentifie un utilisateur et retourne un token JWT"
-    )
-    @ApiResponse(responseCode = "200", description = "Connexion réussie",
-            content = @Content(schema = @Schema(implementation = AuthenticationResponse.class)))
-    @ApiResponse(responseCode = "401", description = "Email ou mot de passe incorrect")
-    @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponse> authenticate(
-            @Valid @RequestBody AuthenticationRequest request
-    ) {
-        return ResponseEntity.ok(authenticationService.authenticate(request));
-    }
-
+    // ─── Reset password (toujours utile côté serveur) ───
 
     @Operation(
             summary = "Demande de réinitialisation de mot de passe",
@@ -63,15 +57,13 @@ public class AuthController {
     ) {
         String token = passwordResetService.createResetToken(request.getEmail());
 
-        // On ne divulgue pas si l'email existe.
         var response = PasswordResetRequestResponse.builder()
                 .message("Si l'email existe, un lien de réinitialisation a été généré")
-                .token(token) // présent uniquement si l'email existe
+                .token(token)
                 .build();
 
         return ResponseEntity.ok(response);
     }
-
 
 
     @Operation(

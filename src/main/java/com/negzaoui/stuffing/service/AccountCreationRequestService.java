@@ -1,13 +1,13 @@
 package com.negzaoui.stuffing.service;
 
 import com.negzaoui.stuffing.dto.auth.AccountCreationRequestDto;
-import com.negzaoui.stuffing.entity.AccountCreationRequest;
-import com.negzaoui.stuffing.entity.AccountRequestStatus;
-import com.negzaoui.stuffing.entity.Role;
-import com.negzaoui.stuffing.entity.User;
+import com.negzaoui.stuffing.entity.*;
 import com.negzaoui.stuffing.repository.AccountCreationRequestRepository;
+import com.negzaoui.stuffing.repository.EmployeeProfileRepository;
 import com.negzaoui.stuffing.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -19,15 +19,21 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AccountCreationRequestService {
 
     private final AccountCreationRequestRepository requestRepository;
     private final UserRepository userRepository;
+    private final EmployeeProfileRepository employeeProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final KeycloakAdminService keycloakAdminService;
+
+    @Value("${app.frontend-url:http://localhost:4200/login}")
+    private String frontendUrl;
 
     /**
      * Soumission d'une nouvelle demande (si une PENDING existe déjà pour le même email, on évite un doublon).
@@ -76,8 +82,8 @@ public class AccountCreationRequestService {
     }
 
     /**
-     * APPROVE : Crée (ou réutilise) un utilisateur et marque la demande APPROVED.
-     * La demande est conservée pour traçabilité (processedAt / processedBy).
+     * APPROVE : Crée le user dans Keycloak + en BD locale, marque la demande APPROVED,
+     * et envoie un email avec les credentials temporaires.
      */
     @Transactional
     public User approve(Long requestId, Role role, String temporaryPassword, Authentication processedBy) {
@@ -88,44 +94,110 @@ public class AccountCreationRequestService {
             throw new IllegalStateException("Demande déjà traitée");
         }
 
-        // Si le compte existe déjà, on valide la demande sans recréer l'utilisateur.
-        if (userRepository.existsByEmail(req.getEmail())) {
+        // ═══════════════════════════════════════════════════════
+        // 0. Générer l'email PROFESSIONNEL (@soprahr.com)
+        // ═══════════════════════════════════════════════════════
+        String professionalEmail = generateProfessionalEmail(req.getFirstName(), req.getLastName());
+        String personalEmail = req.getEmail(); // email personnel fourni dans la demande
+
+        // Si le compte existe déjà localement (avec cet email pro), on valide sans recréer.
+        if (userRepository.existsByEmail(professionalEmail)) {
             req.setStatus(AccountRequestStatus.APPROVED);
             req.setProcessedAt(Instant.now());
             req.setProcessedBy(processedBy != null ? processedBy.getName() : null);
             requestRepository.save(req);
-            return userRepository.findByEmail(req.getEmail()).orElseThrow();
+            log.warn("⚠️  Le user {} existait déjà en BD locale. Demande marquée APPROVED sans recréation.", professionalEmail);
+            return userRepository.findByEmail(professionalEmail).orElseThrow();
         }
 
+        // Générer un mot de passe temporaire si non fourni
         String rawPassword = (temporaryPassword == null || temporaryPassword.isBlank())
                 ? generateTempPassword()
                 : temporaryPassword;
 
+        // ═══════════════════════════════════════════════════════
+        // 1. Créer (ou réutiliser) le user dans Keycloak avec l'email PRO
+        // ═══════════════════════════════════════════════════════
+        String keycloakId;
+        try {
+            String existingId = keycloakAdminService.findUserIdByEmail(professionalEmail);
+            if (existingId != null) {
+                log.warn("⚠️  Le user {} existe déjà dans Keycloak (id={}). Réinitialisation du mdp.", professionalEmail, existingId);
+                keycloakAdminService.setUserPassword(existingId, rawPassword, true);
+                keycloakAdminService.assignRealmRole(existingId, role.name());
+                keycloakId = existingId;
+            } else {
+                keycloakId = keycloakAdminService.createUser(
+                        professionalEmail, // ← email pro comme username/email Keycloak
+                        req.getFirstName(),
+                        req.getLastName(),
+                        rawPassword,
+                        role
+                );
+            }
+        } catch (Exception e) {
+            log.error("❌ Échec création user Keycloak pour {} : {}", professionalEmail, e.getMessage(), e);
+            throw new RuntimeException("Impossible de créer le compte dans Keycloak : " + e.getMessage());
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 2. Créer le user en BD locale avec l'email PRO
+        // ═══════════════════════════════════════════════════════
         var user = User.builder()
                 .firstName(req.getFirstName())
                 .lastName(req.getLastName())
-                .email(req.getEmail())
+                .email(professionalEmail)        // ← email pro = identifiant
+                .personalEmail(personalEmail)     // ← email personnel conservé
                 .password(passwordEncoder.encode(rawPassword))
+                .keycloakId(keycloakId)
                 .role(role)
+                .active(true)
                 .build();
 
         userRepository.save(user);
+        log.info("✅ User créé en BD locale : {} (email pro={}, email perso={}, keycloakId={})",
+                user.getEmail(), professionalEmail, personalEmail, keycloakId);
 
-        // Mettre à jour la demande pour garder l'historique
+        // ═══════════════════════════════════════════════════════
+        // 2b. Créer un EmployeeProfile vide pour le nouveau user
+        // ═══════════════════════════════════════════════════════
+        EmployeeProfile profile = EmployeeProfile.builder()
+                .user(user)
+                .phone(req.getPhone())
+                .department(null)
+                .build();
+        employeeProfileRepository.save(profile);
+        log.info("✅ EmployeeProfile créé pour {}", professionalEmail);
+
+        // ═══════════════════════════════════════════════════════
+        // 3. Mettre à jour la demande
+        // ═══════════════════════════════════════════════════════
         req.setStatus(AccountRequestStatus.APPROVED);
         req.setProcessedAt(Instant.now());
         req.setProcessedBy(processedBy != null ? processedBy.getName() : null);
         requestRepository.save(req);
 
-        // Notifier l'utilisateur avec son mot de passe (ou log selon ta conf)
-        emailService.sendAccountApprovedEmail(user.getEmail(), rawPassword);
+        // ═══════════════════════════════════════════════════════
+        // 4. Envoyer email sur le mail PERSONNEL avec les identifiants PRO
+        // ═══════════════════════════════════════════════════════
+        try {
+            emailService.sendAccountApprovedEmail(personalEmail, professionalEmail, rawPassword, frontendUrl);
+        } catch (Exception e) {
+            log.warn("Echec envoi email pour {} : {} (le compte a ete cree quand meme)", personalEmail, e.getMessage());
+        }
 
-        // Notification in-app pour le nouveau utilisateur
-        notificationService.createNotification(
-                "Bienvenue ! Votre compte a été créé avec succès.",
-                "ACCOUNT_APPROVED",
-                user
-        );
+        // ═══════════════════════════════════════════════════════
+        // 5. Notification in-app
+        // ═══════════════════════════════════════════════════════
+        try {
+            notificationService.createNotification(
+                    "Bienvenue ! Votre compte a été créé. Votre identifiant : " + professionalEmail,
+                    "ACCOUNT_APPROVED",
+                    user
+            );
+        } catch (Exception e) {
+            log.warn("Echec notification in-app pour {} : {}", user.getEmail(), e.getMessage());
+        }
 
         return user;
     }
@@ -147,7 +219,11 @@ public class AccountCreationRequestService {
         req.setProcessedBy(processedBy != null ? processedBy.getName() : null);
         requestRepository.save(req);
 
-        emailService.sendAccountRejectedEmail(req.getEmail(), reason);
+        try {
+            emailService.sendAccountRejectedEmail(req.getEmail(), reason);
+        } catch (Exception e) {
+            log.warn("Echec envoi email de rejet pour {} : {}", req.getEmail(), e.getMessage());
+        }
     }
 
     // ---------------------
@@ -155,12 +231,40 @@ public class AccountCreationRequestService {
     // ---------------------
 
     private String generateTempPassword() {
-        // Simple pour PFE. En prod : politique de complexité configurable.
         final String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#-";
         SecureRandom rnd = new SecureRandom();
         int len = 12;
         StringBuilder sb = new StringBuilder(len);
         for (int i = 0; i < len; i++) sb.append(chars.charAt(rnd.nextInt(chars.length())));
         return sb.toString();
+    }
+
+    /**
+     * Génère un email professionnel @soprahr.com à partir du prénom et nom.
+     * Ex: "Mohamed" + "Negzaoui" → "mohamed.negzaoui@soprahr.com"
+     * Gère les accents, espaces, et doublons (ajoute un suffixe numérique si nécessaire).
+     */
+    private String generateProfessionalEmail(String firstName, String lastName) {
+        String base = normalize(firstName) + "." + normalize(lastName) + "@soprahr.com";
+
+        // Vérifier s'il n'y a pas déjà un user avec ce mail pro
+        String candidate = base;
+        int counter = 1;
+        while (userRepository.existsByEmail(candidate)) {
+            candidate = normalize(firstName) + "." + normalize(lastName) + counter + "@soprahr.com";
+            counter++;
+        }
+        return candidate;
+    }
+
+    /**
+     * Normalise un prénom/nom : minuscule, sans accents, sans espaces.
+     */
+    private String normalize(String input) {
+        if (input == null) return "";
+        return java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD)
+                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                .replaceAll("[^a-zA-Z]", "")
+                .toLowerCase();
     }
 }

@@ -28,7 +28,7 @@ public class Notification {
     /** Utilisateur cible de la notification (ex: l'ADMIN qui doit voir la demande). Null = broadcast. */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "target_user_id")
-    @JsonIgnoreProperties({"password", "authorities", "username", "accountNonExpired", "accountNonLocked", "credentialsNonExpired", "enabled"})
+    @JsonIgnoreProperties({"password", "profile"})
     private User targetUser;
 
     @Builder.Default

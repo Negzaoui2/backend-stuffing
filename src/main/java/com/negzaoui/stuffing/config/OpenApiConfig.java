@@ -19,7 +19,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Stuffing API")
                         .version("1.0")
-                        .description("Documentation de l'API Stuffing – Plateforme de planification du staffing"))
+                        .description("Documentation de l'API Stuffing – Plateforme de planification du stUffing"))
                 // Ajoute le bouton "Authorize 🔒" dans Swagger
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
                 .components(new Components()
@@ -29,7 +29,7 @@ public class OpenApiConfig {
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
-                                        .description("Coller ici le token JWT obtenu via /api/auth/login")
+                                        .description("Coller ici le token JWT obtenu via Keycloak (POST /realms/stuffing/protocol/openid-connect/token)")
                         )
                 );
     }

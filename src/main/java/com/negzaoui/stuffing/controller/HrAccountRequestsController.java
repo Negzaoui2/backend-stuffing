@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,8 +29,10 @@ public class HrAccountRequestsController {
     @GetMapping("/account-requests")
     public ResponseEntity<Page<AccountCreationRequest>> list(
             @RequestParam(name = "status", required = false) AccountRequestStatus status,
-            Pageable pageable
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size
     ) {
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(service.list(status, pageable));
     }
 

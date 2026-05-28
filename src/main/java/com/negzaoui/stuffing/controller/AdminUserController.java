@@ -1,59 +1,60 @@
 package com.negzaoui.stuffing.controller;
 
 import com.negzaoui.stuffing.dto.MessageResponse;
-import com.negzaoui.stuffing.dto.admin.CreateUserRequest;
-import com.negzaoui.stuffing.dto.admin.ResetPasswordRequest;
-import com.negzaoui.stuffing.entity.User;
-import com.negzaoui.stuffing.repository.UserRepository;
+import com.negzaoui.stuffing.dto.admin.*;
+import com.negzaoui.stuffing.service.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
-@Tag(name = "Admin - Gestion des utilisateurs", description = "Endpoints ADMIN pour gérer les users (créer, lister, changer mdp)")
+@Tag(name = "Admin - Gestion des utilisateurs", description = "Endpoints ADMIN pour gérer les users")
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AdminUserService adminUserService;
 
-
-    @Operation(summary = "Lister tous les utilisateurs")
+    @Operation(summary = "Lister les utilisateurs (paginé, avec filtres)")
     @GetMapping
-    public ResponseEntity<List<User>> listAll() {
-        return ResponseEntity.ok(userRepository.findAll());
+    public ResponseEntity<UserPageResponse> listUsers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(adminUserService.searchUsers(search, role, isActive, page, size));
     }
 
-    @Operation(summary = "Créer un utilisateur avec un rôle (ADMIN, MANAGER, COLLABORATEUR)")
+    @Operation(summary = "Obtenir le détail d'un utilisateur")
+    @GetMapping("/{id}")
+    public ResponseEntity<UserAdminDto> getUser(@PathVariable Long id) {
+        return ResponseEntity.ok(adminUserService.getUserById(id));
+    }
+
+    @Operation(summary = "Créer un utilisateur avec un rôle (ADMIN, DELIVERY_MANAGER, COLLABORATEUR)")
     @PostMapping
-    public ResponseEntity<MessageResponse> createUser(@Valid @RequestBody CreateUserRequest req) {
-        if (userRepository.existsByEmail(req.getEmail())) {
-            return ResponseEntity.badRequest().body(
-                    MessageResponse.builder().message("Email déjà utilisé : " + req.getEmail()).build()
-            );
-        }
+    public ResponseEntity<UserAdminDto> createUser(@Valid @RequestBody CreateUserRequest req) {
+        return ResponseEntity.ok(adminUserService.createUser(req));
+    }
 
-        var user = User.builder()
-                .firstName(req.getFirstName())
-                .lastName(req.getLastName())
-                .email(req.getEmail())
-                .password(passwordEncoder.encode(req.getPassword()))
-                .role(req.getRole())
-                .build();
+    @Operation(summary = "Activer / Désactiver un utilisateur")
+    @PutMapping("/{id}/toggle-status")
+    public ResponseEntity<ToggleStatusResponse> toggleStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(adminUserService.toggleStatus(id));
+    }
 
-        userRepository.save(user);
-        return ResponseEntity.ok(
-                MessageResponse.builder().message("Utilisateur créé : " + req.getEmail() + " [" + req.getRole() + "]").build()
-        );
+    @Operation(summary = "Supprimer un utilisateur")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<MessageResponse> deleteUser(@PathVariable Long id) {
+        adminUserService.deleteUser(id);
+        return ResponseEntity.ok(MessageResponse.builder().message("Utilisateur supprimé").build());
     }
 
     @Operation(summary = "Réinitialiser le mot de passe d'un utilisateur (par ID)")
@@ -62,15 +63,7 @@ public class AdminUserController {
             @PathVariable Long id,
             @Valid @RequestBody ResetPasswordRequest req
     ) {
-        var user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable (id=" + id + ")"));
-
-        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
-        userRepository.save(user);
-
-        return ResponseEntity.ok(
-                MessageResponse.builder().message("Mot de passe réinitialisé pour " + user.getEmail()).build()
-        );
+        adminUserService.resetPassword(id, req.getNewPassword());
+        return ResponseEntity.ok(MessageResponse.builder().message("Mot de passe réinitialisé").build());
     }
 }
-

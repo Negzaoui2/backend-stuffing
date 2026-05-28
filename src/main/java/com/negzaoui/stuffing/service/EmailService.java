@@ -6,11 +6,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
  * Envoi d'emails.
- *
+ * Toutes les methodes sont @Async pour ne pas bloquer la requete HTTP.
  * Mode PFE/dev: si app.mail.enabled=false, on log le contenu au lieu d'envoyer.
  */
 @Slf4j
@@ -23,13 +24,14 @@ public class EmailService {
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
 
-    @Value("${app.mail.from:no-reply@stuffing.local}")
+    @Value("${app.mail.from:no-reply@sopraHr.com}")
     private String from;
 
     private JavaMailSender getMailSenderOrNull() {
         return mailSenderProvider.getIfAvailable();
     }
 
+    @Async
     public void sendPasswordResetEmail(String to, String resetLinkOrToken) {
         String subject = "Réinitialisation de mot de passe";
         String body = "Bonjour,\n\n" +
@@ -58,6 +60,7 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    @Async
     public void sendAccountRequestReceived(String requesterEmail) {
         String subject = "Demande de création de compte reçue";
         String body = "Bonjour,\n\n" +
@@ -84,13 +87,31 @@ public class EmailService {
         mailSender.send(message);
     }
 
-    public void sendAccountApprovedEmail(String to, String temporaryPassword) {
-        String subject = "Votre compte a été créé";
+    /**
+     * Envoie le mail de bienvenue sur l'email PERSONNEL du demandeur,
+     * en lui communiquant son email PROFESSIONNEL (@soprahr.com) et son mot de passe temporaire.
+     *
+     * @param personalEmail     email personnel du demandeur (destinataire du mail)
+     * @param professionalEmail email professionnel généré (prenom.nom@soprahr.com)
+     * @param temporaryPassword mot de passe temporaire
+     * @param loginUrl          URL de connexion (frontend)
+     */
+    @Async
+    public void sendAccountApprovedEmail(String personalEmail, String professionalEmail,
+                                         String temporaryPassword, String loginUrl) {
+        String subject = "🎉 Votre compte Sopra HR Stuffing a été créé";
         String body = "Bonjour,\n\n" +
-                "Votre compte a été créé. Voici vos informations de connexion :\n" +
-                "Email: " + to + "\n" +
-                "Mot de passe temporaire: " + temporaryPassword + "\n\n" +
-                "Nous vous recommandons de changer votre mot de passe après la première connexion.";
+                "Votre demande d'accès à la plateforme Stuffing a été approuvée !\n\n" +
+                "Voici vos identifiants professionnels :\n\n" +
+                "🔗 URL de connexion : " + (loginUrl != null ? loginUrl : "http://localhost:4200/login") + "\n" +
+                "📧 Email professionnel : " + professionalEmail + "\n" +
+                "🔐 Mot de passe temporaire : " + temporaryPassword + "\n\n" +
+                "⚠️  À votre première connexion, vous devrez obligatoirement changer votre mot de passe.\n\n" +
+                "📌 Conservez bien votre email professionnel, c'est votre identifiant de connexion.\n\n" +
+                "Bienvenue dans l'équipe Sopra HR ! 🚀\n\n" +
+                "—\n" +
+                "L'équipe Stuffing";
+        String to = personalEmail;
 
         if (!mailEnabled) {
             log.warn("[MAIL DISABLED] To={}, Subject={}, Body=\n{}", to, subject, body);
@@ -111,6 +132,15 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    /**
+     * Surcharge pour rétrocompatibilité (sans loginUrl).
+     */
+    @Async
+    public void sendAccountApprovedEmail(String personalEmail, String professionalEmail, String temporaryPassword) {
+        sendAccountApprovedEmail(personalEmail, professionalEmail, temporaryPassword, null);
+    }
+
+    @Async
     public void sendAccountRejectedEmail(String to, String reason) {
         String subject = "Demande de création de compte";
         String body = "Bonjour,\n\n" +
