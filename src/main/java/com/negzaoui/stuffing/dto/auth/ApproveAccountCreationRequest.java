@@ -20,5 +20,11 @@ public class ApproveAccountCreationRequest {
      * Optionnel: si null, on génère un mot de passe temporaire.
      */
     private String temporaryPassword;
+
+    /**
+     * Optionnel: ID du manager auquel assigner le collaborateur.
+     * Utilisé uniquement quand role = COLLABORATEUR.
+     */
+    private Long managerId;
 }
 

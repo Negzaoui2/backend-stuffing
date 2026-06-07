@@ -86,7 +86,7 @@ public class AccountCreationRequestService {
      * et envoie un email avec les credentials temporaires.
      */
     @Transactional
-    public User approve(Long requestId, Role role, String temporaryPassword, Authentication processedBy) {
+    public User approve(Long requestId, Role role, String temporaryPassword, Long managerId, Authentication processedBy) {
         var req = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Demande introuvable"));
 
@@ -161,13 +161,25 @@ public class AccountCreationRequestService {
         // ═══════════════════════════════════════════════════════
         // 2b. Créer un EmployeeProfile vide pour le nouveau user
         // ═══════════════════════════════════════════════════════
+        User assignedManager = null;
+        if (managerId != null && role == Role.COLLABORATEUR) {
+            assignedManager = userRepository.findById(managerId)
+                    .filter(m -> m.getRole() == Role.DELIVERY_MANAGER)
+                    .orElse(null);
+            if (assignedManager == null) {
+                log.warn("⚠️  managerId={} introuvable ou n'est pas DELIVERY_MANAGER. Ignoré.", managerId);
+            }
+        }
+
         EmployeeProfile profile = EmployeeProfile.builder()
                 .user(user)
                 .phone(req.getPhone())
                 .department(null)
+                .manager(assignedManager)
                 .build();
         employeeProfileRepository.save(profile);
-        log.info("✅ EmployeeProfile créé pour {}", professionalEmail);
+        log.info("✅ EmployeeProfile créé pour {} (manager={})", professionalEmail,
+                assignedManager != null ? assignedManager.getEmail() : "aucun");
 
         // ═══════════════════════════════════════════════════════
         // 3. Mettre à jour la demande

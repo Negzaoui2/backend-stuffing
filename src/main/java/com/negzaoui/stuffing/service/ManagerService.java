@@ -718,10 +718,20 @@ public class ManagerService {
     }
 
     private List<Long> getTeamUserIds(Long managerId) {
+        // 1. Collaborateurs assignés aux projets du manager
         List<Project> projects = projectRepository.findByManagerId(managerId);
-        return projects.stream()
+        List<Long> fromProjects = projects.stream()
                 .flatMap(p -> p.getAssignments().stream())
                 .map(a -> a.getEmployeeProfile().getUser().getId())
+                .toList();
+
+        // 2. Collaborateurs assignés directement au manager (via EmployeeProfile.manager)
+        List<Long> fromProfile = employeeProfileRepository.findByManagerId(managerId).stream()
+                .map(ep -> ep.getUser().getId())
+                .toList();
+
+        // Fusionner et dédupliquer
+        return java.util.stream.Stream.concat(fromProjects.stream(), fromProfile.stream())
                 .distinct().toList();
     }
 

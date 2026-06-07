@@ -25,6 +25,10 @@ public class EmployeeProfile {
     private String phone;
     private String department;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private User manager;  // Manager assigné (nullable — rempli à l'approbation)
+
     @Builder.Default
     @OneToMany(mappedBy = "employeeProfile", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Skill> skills = new ArrayList<>();
