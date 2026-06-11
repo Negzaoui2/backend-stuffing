@@ -38,7 +38,7 @@ public class ManagerService {
     @Transactional(readOnly = true)
     public ManagerDashboardDto getDashboard(Long managerId) {
         List<Project> projects = projectRepository.findByManagerId(managerId);
-        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects);
+        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects, managerId);
 
         int totalCollaborators = teamProfiles.size();
         int activeProjects = (int) projects.stream()
@@ -118,7 +118,7 @@ public class ManagerService {
                                                      String skill, String availability,
                                                      int page, int size) {
         List<Project> projects = projectRepository.findByManagerId(managerId);
-        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects);
+        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects, managerId);
 
         LocalDate now = LocalDate.now();
         LocalDate soonLimit = now.plusDays(SOON_AVAILABLE_DAYS);
@@ -156,7 +156,7 @@ public class ManagerService {
     public CollaboratorDto getCollaboratorDetail(Long managerId, Long userId) {
         // Verify the collaborator belongs to one of the manager's projects
         List<Project> projects = projectRepository.findByManagerId(managerId);
-        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects);
+        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects, managerId);
 
         EmployeeProfile ep = teamProfiles.stream()
                 .filter(p -> p.getUser().getId().equals(userId))
@@ -226,9 +226,11 @@ public class ManagerService {
     //  HELPERS
     // ═══════════════════════════════════════════════════════════
 
-    /** Collecte tous les EmployeeProfiles assignes aux projets du manager */
-    private Set<EmployeeProfile> collectTeamProfiles(List<Project> projects) {
+    /** Collecte tous les EmployeeProfiles : assignés aux projets du manager + rattachés via EmployeeProfile.manager */
+    private Set<EmployeeProfile> collectTeamProfiles(List<Project> projects, Long managerId) {
         Set<EmployeeProfile> profiles = new LinkedHashSet<>();
+
+        // 1. Via les assignments sur les projets du manager
         for (Project p : projects) {
             for (Assignment a : p.getAssignments()) {
                 if (a.getEmployeeProfile() != null) {
@@ -236,6 +238,10 @@ public class ManagerService {
                 }
             }
         }
+
+        // 2. Via EmployeeProfile.manager (collaborateurs approuvés mais pas encore assignés à un projet)
+        profiles.addAll(employeeProfileRepository.findByManagerId(managerId));
+
         return profiles;
     }
 
@@ -330,12 +336,14 @@ public class ManagerService {
     private ProjectDto toProjectDto(Project p) {
         List<ProjectMemberDto> team = p.getAssignments().stream()
                 .filter(a -> a.getEmployeeProfile() != null && a.getEmployeeProfile().getUser() != null)
+                .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE)
                 .map(a -> {
                     User u = a.getEmployeeProfile().getUser();
                     List<String> skills = a.getEmployeeProfile().getSkills().stream()
                             .map(Skill::getName).collect(Collectors.toList());
                     return ProjectMemberDto.builder()
                             .id(u.getId())
+                            .assignmentId(a.getId())
                             .firstName(u.getFirstName())
                             .lastName(u.getLastName())
                             .role(a.getRoleName())
@@ -349,7 +357,7 @@ public class ManagerService {
                 .name(p.getName())
                 .clientName(p.getClientName())
                 .description(p.getDescription())
-                .status(p.getStatus() != null ? p.getStatus().name() : null)
+                .status(p.getStatus().name())
                 .startDate(p.getStartDate() != null ? p.getStartDate().format(D_FMT) : null)
                 .endDate(p.getEndDate() != null ? p.getEndDate().format(D_FMT) : null)
                 .teamSize(team.size())
@@ -459,7 +467,7 @@ public class ManagerService {
     @Transactional(readOnly = true)
     public List<CalendarResourceDto> getCalendarResources(Long managerId) {
         List<Project> projects = projectRepository.findByManagerId(managerId);
-        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects);
+        Set<EmployeeProfile> teamProfiles = collectTeamProfiles(projects, managerId);
         LocalDate now = LocalDate.now();
         LocalDate soonLimit = now.plusDays(SOON_AVAILABLE_DAYS);
 
@@ -620,6 +628,7 @@ public class ManagerService {
                     User u = a.getEmployeeProfile().getUser();
                     return ProjectMemberDto.builder()
                             .id(u.getId())
+                            .assignmentId(a.getId())
                             .firstName(u.getFirstName())
                             .lastName(u.getLastName())
                             .role(a.getRoleName())
