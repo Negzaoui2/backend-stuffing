@@ -27,6 +27,7 @@ public class DataInitializer {
                                ProjectRepository projectRepository,
                                AssignmentRepository assignmentRepository,
                                LeaveRequestRepository leaveRequestRepository,
+                               DepartementRepository departementRepository,
                                PasswordEncoder passwordEncoder) {
         return args -> {
 
@@ -117,7 +118,8 @@ public class DataInitializer {
             if (projectRepository.findByManagerId(manager.getId()).isEmpty()) {
                 log.info("🔧 Insertion des donnees de demo pour le manager {} ...", dmEmail);
                 seedDemoData(manager, userRepository, employeeProfileRepository,
-                        projectRepository, assignmentRepository, leaveRequestRepository, passwordEncoder);
+                        projectRepository, assignmentRepository, leaveRequestRepository,
+                        departementRepository, passwordEncoder);
                 log.info("✅ Donnees de demo inserees avec succes !");
             } else {
                 log.info("📦 Donnees de demo deja presentes pour le manager {}", dmEmail);
@@ -135,10 +137,18 @@ public class DataInitializer {
                               ProjectRepository projectRepository,
                               AssignmentRepository assignmentRepository,
                               LeaveRequestRepository leaveRequestRepository,
+                              DepartementRepository departementRepository,
                               PasswordEncoder passwordEncoder) {
 
         String collabPassword = passwordEncoder.encode("Collab1234!");
         LocalDate now = LocalDate.now();
+
+        // ─── Départements ────────────────────────────────────────
+        Departement deptIT = getOrCreateDepartement(departementRepository, "DSI");
+        Departement deptData = getOrCreateDepartement(departementRepository, "cs");
+        Departement deptQA = getOrCreateDepartement(departementRepository, "RD");
+        Departement deptDevOps = getOrCreateDepartement(departementRepository, "ProdOps");
+        Departement deptDesign = getOrCreateDepartement(departementRepository, "Design");
 
         // ─── 8 Collaborateurs ─────────────────────────────────
 
@@ -153,14 +163,14 @@ public class DataInitializer {
 
         // ─── Profils + Skills ─────────────────────────────────
 
-        EmployeeProfile ep1 = createProfile(employeeProfileRepository, c1, "0661000001", "IT", List.of("Java", "Spring Boot", "Angular"));
-        EmployeeProfile ep2 = createProfile(employeeProfileRepository, c2, "0661000002", "IT", List.of("React", "TypeScript", "Node.js"));
-        EmployeeProfile ep3 = createProfile(employeeProfileRepository, c3, "0661000003", "IT", List.of("Python", "Django", "PostgreSQL"));
-        EmployeeProfile ep4 = createProfile(employeeProfileRepository, c4, "0661000004", "Data", List.of("Python", "Machine Learning", "SQL"));
-        EmployeeProfile ep5 = createProfile(employeeProfileRepository, c5, "0661000005", "IT", List.of("Java", "Spring Boot", "Docker", "Kubernetes"));
-        EmployeeProfile ep6 = createProfile(employeeProfileRepository, c6, "0661000006", "QA", List.of("Selenium", "JUnit", "Postman", "Cypress"));
-        EmployeeProfile ep7 = createProfile(employeeProfileRepository, c7, "0661000007", "DevOps", List.of("Docker", "Kubernetes", "Jenkins", "AWS"));
-        EmployeeProfile ep8 = createProfile(employeeProfileRepository, c8, "0661000008", "Design", List.of("Figma", "Adobe XD", "CSS", "UX/UI"));
+        EmployeeProfile ep1 = createProfile(employeeProfileRepository, c1, "0661000001", deptIT, List.of("Java", "Spring Boot", "Angular"));
+        EmployeeProfile ep2 = createProfile(employeeProfileRepository, c2, "0661000002", deptIT, List.of("React", "TypeScript", "Node.js"));
+        EmployeeProfile ep3 = createProfile(employeeProfileRepository, c3, "0661000003", deptIT, List.of("Python", "Django", "PostgreSQL"));
+        EmployeeProfile ep4 = createProfile(employeeProfileRepository, c4, "0661000004", deptData, List.of("Python", "Machine Learning", "SQL"));
+        EmployeeProfile ep5 = createProfile(employeeProfileRepository, c5, "0661000005", deptIT, List.of("Java", "Spring Boot", "Docker", "Kubernetes"));
+        EmployeeProfile ep6 = createProfile(employeeProfileRepository, c6, "0661000006", deptQA, List.of("Selenium", "JUnit", "Postman", "Cypress"));
+        EmployeeProfile ep7 = createProfile(employeeProfileRepository, c7, "0661000007", deptDevOps, List.of("Docker", "Kubernetes", "Jenkins", "AWS"));
+        EmployeeProfile ep8 = createProfile(employeeProfileRepository, c8, "0661000008", deptDesign, List.of("Figma", "Adobe XD", "CSS", "UX/UI"));
 
         // ─── 4 Projets ───────────────────────────────────────
 
@@ -319,13 +329,13 @@ public class DataInitializer {
     }
 
     private EmployeeProfile createProfile(EmployeeProfileRepository repo, User user,
-                                           String phone, String department,
+                                           String phone, Departement departement,
                                            List<String> skillNames) {
         return repo.findByUserId(user.getId()).orElseGet(() -> {
             EmployeeProfile profile = EmployeeProfile.builder()
                     .user(user)
                     .phone(phone)
-                    .department(department)
+                    .departement(departement)
                     .build();
             // Ajouter les skills
             for (String name : skillNames) {
@@ -337,6 +347,11 @@ public class DataInitializer {
             }
             return repo.save(profile);
         });
+    }
+
+    private Departement getOrCreateDepartement(DepartementRepository repo, String name) {
+        return repo.findByName(name).orElseGet(() ->
+                repo.save(Departement.builder().name(name).build()));
     }
 
     private void createAssignment(AssignmentRepository repo, EmployeeProfile ep,

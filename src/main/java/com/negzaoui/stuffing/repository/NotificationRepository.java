@@ -3,6 +3,9 @@ package com.negzaoui.stuffing.repository;
 import com.negzaoui.stuffing.entity.Notification;
 import com.negzaoui.stuffing.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -25,4 +28,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     long countByIsReadFalse();
 
+    /** Supprime toutes les notifications ciblant un utilisateur (utilisé lors de la suppression d'un user) */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.targetUser.id = :userId")
+    void deleteByTargetUserId(@Param("userId") Long userId);
 }
+
+

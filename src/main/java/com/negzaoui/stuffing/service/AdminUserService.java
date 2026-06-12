@@ -3,6 +3,10 @@ package com.negzaoui.stuffing.service;
 import com.negzaoui.stuffing.dto.admin.*;
 import com.negzaoui.stuffing.entity.*;
 import com.negzaoui.stuffing.repository.EmployeeProfileRepository;
+import com.negzaoui.stuffing.repository.LeaveRequestRepository;
+import com.negzaoui.stuffing.repository.NotificationRepository;
+import com.negzaoui.stuffing.repository.PasswordResetTokenRepository;
+import com.negzaoui.stuffing.repository.ProjectRepository;
 import com.negzaoui.stuffing.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +34,10 @@ public class AdminUserService {
     private final EmployeeProfileRepository employeeProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final KeycloakAdminService keycloakAdminService;
+    private final NotificationRepository notificationRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
+    private final ProjectRepository projectRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final DateTimeFormatter D_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -145,7 +153,29 @@ public class AdminUserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable (id=" + id + ")"));
 
-        // Supprimer aussi dans Keycloak si le user y existe
+        // ═══════════════════════════════════════════════════════
+        // 1. Nettoyer toutes les références vers ce user (sinon violation de FK)
+        // ═══════════════════════════════════════════════════════
+
+        // a) Notifications ciblant ce user
+        notificationRepository.deleteByTargetUserId(id);
+
+        // b) Demandes de congé du user + détacher les congés qu'il a révisés (en tant que manager)
+        leaveRequestRepository.deleteByUserId(id);
+        leaveRequestRepository.clearReviewedBy(id);
+
+        // c) Tokens de réinitialisation de mot de passe
+        passwordResetTokenRepository.deleteByUserId(id);
+
+        // d) Détacher ce user en tant que manager des profils qu'il encadre
+        employeeProfileRepository.clearManager(id);
+
+        // e) Détacher ce user en tant que manager de ses projets
+        projectRepository.clearManager(id);
+
+        // ═══════════════════════════════════════════════════════
+        // 2. Supprimer dans Keycloak
+        // ═══════════════════════════════════════════════════════
         if (user.getKeycloakId() != null) {
             try {
                 keycloakAdminService.deleteUser(user.getKeycloakId());
@@ -164,7 +194,11 @@ public class AdminUserService {
             }
         }
 
+        // ═══════════════════════════════════════════════════════
+        // 3. Supprimer le user (cascade → EmployeeProfile → Skills + Assignments)
+        // ═══════════════════════════════════════════════════════
         userRepository.delete(user);
+        log.info("✅ Utilisateur supprimé : {} (id={})", user.getEmail(), id);
     }
 
     // ─── Reset password ───

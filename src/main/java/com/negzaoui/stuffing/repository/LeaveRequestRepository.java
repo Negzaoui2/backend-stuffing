@@ -6,6 +6,7 @@ import com.negzaoui.stuffing.entity.LeaveType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -66,4 +67,14 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
 
     @Query("SELECT l FROM LeaveRequest l WHERE l.user.id IN :userIds ORDER BY l.createdAt DESC")
     Page<LeaveRequest> findByUserIdIn(@Param("userIds") List<Long> userIds, Pageable pageable);
+
+    /** Supprime tous les congés d'un utilisateur (lors de la suppression d'un user) */
+    @Modifying
+    @Query("DELETE FROM LeaveRequest l WHERE l.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
+
+    /** Détache le réviseur des congés qu'il a traités (lors de la suppression d'un user manager) */
+    @Modifying
+    @Query("UPDATE LeaveRequest l SET l.reviewedBy = null WHERE l.reviewedBy.id = :userId")
+    void clearReviewedBy(@Param("userId") Long userId);
 }

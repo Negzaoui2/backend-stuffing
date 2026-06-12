@@ -2,8 +2,9 @@ package com.negzaoui.stuffing.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
 
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,5 +21,7 @@ public class Departement {
     @Column(nullable = false, unique = true)
     private String name;
 
-
+    @Builder.Default
+    @OneToMany(mappedBy = "departement", fetch = FetchType.LAZY)
+    private List<EmployeeProfile> employees = new ArrayList<>();
 }

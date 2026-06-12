@@ -2,6 +2,7 @@ package com.negzaoui.stuffing.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -54,6 +55,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
         log.warn("IllegalStateException on {}: {}", request.getRequestURI(), ex.getMessage());
         return build(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+        log.warn("DataIntegrityViolationException on {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.CONFLICT,
+                "Impossible d'effectuer cette opération : cet élément est encore lié à d'autres données.",
+                request, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -23,7 +23,10 @@ public class EmployeeProfile {
     private User user;
 
     private String phone;
-    private String department;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "departement_id")
+    private Departement departement;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
@@ -36,4 +39,11 @@ public class EmployeeProfile {
     @Builder.Default
     @OneToMany(mappedBy = "employeeProfile", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Assignment> assignments = new ArrayList<>();
+
+    /**
+     * Helper pour récupérer le nom du département (compatibilité avec le code existant)
+     */
+    public String getDepartment() {
+        return departement != null ? departement.getName() : null;
+    }
 }

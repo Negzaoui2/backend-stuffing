@@ -174,7 +174,7 @@ public class AccountCreationRequestService {
         EmployeeProfile profile = EmployeeProfile.builder()
                 .user(user)
                 .phone(req.getPhone())
-                .department(null)
+                .departement(null)
                 .manager(assignedManager)
                 .build();
         employeeProfileRepository.save(profile);
