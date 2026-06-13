@@ -52,7 +52,8 @@ public class HrAccountRequestsController {
             @Valid @RequestBody ApproveAccountCreationRequest body,
             Authentication authentication
     ) {
-        var user = service.approve(id, body.getRole(), body.getTemporaryPassword(), body.getManagerId(), authentication);
+        var user = service.approve(id, body.getRole(), body.getTemporaryPassword(),
+                body.getManagerId(), body.getDepartementId(), authentication);
         return ResponseEntity.ok(
                 MessageResponse.builder().message("Compte créé/validé pour " + user.getEmail()).build()
         );

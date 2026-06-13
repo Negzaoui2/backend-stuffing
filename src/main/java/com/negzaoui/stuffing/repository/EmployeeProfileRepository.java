@@ -15,6 +15,9 @@ public interface EmployeeProfileRepository extends JpaRepository<EmployeeProfile
     Optional<EmployeeProfile> findByUserId(Long userId);
     List<EmployeeProfile> findByManagerId(Long managerId);
 
+    /** Profils rattachés à un département (filtrage par FK departement_id) */
+    List<EmployeeProfile> findByDepartementId(Long departementId);
+
     /** Détache le manager des profils qu'il encadre (lors de la suppression d'un user manager) */
     @Modifying
     @Query("UPDATE EmployeeProfile ep SET ep.manager = null WHERE ep.manager.id = :managerId")

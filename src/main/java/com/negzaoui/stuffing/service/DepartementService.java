@@ -1,9 +1,12 @@
 package com.negzaoui.stuffing.service;
 
+import com.negzaoui.stuffing.dto.admin.CollaborateurDto;
 import com.negzaoui.stuffing.dto.admin.CreateDepartementRequest;
 import com.negzaoui.stuffing.dto.admin.DepartementDto;
 import com.negzaoui.stuffing.entity.Departement;
+import com.negzaoui.stuffing.entity.User;
 import com.negzaoui.stuffing.repository.DepartementRepository;
+import com.negzaoui.stuffing.repository.EmployeeProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
 public class DepartementService {
 
     private final DepartementRepository departementRepository;
+    private final EmployeeProfileRepository employeeProfileRepository;
 
     @Transactional(readOnly = true)
     public List<DepartementDto> getAllDepartements() {
@@ -29,6 +33,23 @@ public class DepartementService {
         Departement dept = departementRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Département introuvable (id=" + id + ")"));
         return toDto(dept);
+    }
+
+    /**
+     * Liste les collaborateurs rattachés à un département (filtrage par FK departement_id).
+     * Lève une exception 404 si le département n'existe pas.
+     */
+    @Transactional(readOnly = true)
+    public List<CollaborateurDto> getCollaborateursByDepartement(Long id) {
+        if (!departementRepository.existsById(id)) {
+            throw new IllegalArgumentException("Département introuvable (id=" + id + ")");
+        }
+
+        return employeeProfileRepository.findByDepartementId(id).stream()
+                .map(ep -> ep.getUser())
+                .filter(u -> u != null)
+                .map(this::toCollaborateurDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -80,6 +101,17 @@ public class DepartementService {
                 .id(dept.getId())
                 .name(dept.getName())
                 .employeeCount(count)
+                .build();
+    }
+
+    private CollaborateurDto toCollaborateurDto(User u) {
+        return CollaborateurDto.builder()
+                .id(u.getId())
+                .firstName(u.getFirstName())
+                .lastName(u.getLastName())
+                .email(u.getEmail())
+                .role(u.getRole() != null ? u.getRole().name() : null)
+                .isActive(u.isActive())
                 .build();
     }
 }

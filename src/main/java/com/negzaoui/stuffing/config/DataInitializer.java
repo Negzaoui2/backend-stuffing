@@ -144,10 +144,10 @@ public class DataInitializer {
         LocalDate now = LocalDate.now();
 
         // ─── Départements ────────────────────────────────────────
-        Departement deptIT = getOrCreateDepartement(departementRepository, "DSI");
-        Departement deptData = getOrCreateDepartement(departementRepository, "cs");
-        Departement deptQA = getOrCreateDepartement(departementRepository, "RD");
-        Departement deptDevOps = getOrCreateDepartement(departementRepository, "ProdOps");
+        Departement deptDSI= getOrCreateDepartement(departementRepository, "DSI");
+        Departement deptData = getOrCreateDepartement(departementRepository, "Data");
+        Departement deptQA = getOrCreateDepartement(departementRepository, "QA");
+        Departement deptProdOps = getOrCreateDepartement(departementRepository, "ProdOps");
         Departement deptDesign = getOrCreateDepartement(departementRepository, "Design");
 
         // ─── 8 Collaborateurs ─────────────────────────────────
@@ -163,13 +163,13 @@ public class DataInitializer {
 
         // ─── Profils + Skills ─────────────────────────────────
 
-        EmployeeProfile ep1 = createProfile(employeeProfileRepository, c1, "0661000001", deptIT, List.of("Java", "Spring Boot", "Angular"));
-        EmployeeProfile ep2 = createProfile(employeeProfileRepository, c2, "0661000002", deptIT, List.of("React", "TypeScript", "Node.js"));
-        EmployeeProfile ep3 = createProfile(employeeProfileRepository, c3, "0661000003", deptIT, List.of("Python", "Django", "PostgreSQL"));
+        EmployeeProfile ep1 = createProfile(employeeProfileRepository, c1, "0661000001", deptDSI, List.of("Java", "Spring Boot", "Angular"));
+        EmployeeProfile ep2 = createProfile(employeeProfileRepository, c2, "0661000002", deptDSI, List.of("React", "TypeScript", "Node.js"));
+        EmployeeProfile ep3 = createProfile(employeeProfileRepository, c3, "0661000003", deptDSI, List.of("Python", "Django", "PostgreSQL"));
         EmployeeProfile ep4 = createProfile(employeeProfileRepository, c4, "0661000004", deptData, List.of("Python", "Machine Learning", "SQL"));
-        EmployeeProfile ep5 = createProfile(employeeProfileRepository, c5, "0661000005", deptIT, List.of("Java", "Spring Boot", "Docker", "Kubernetes"));
+        EmployeeProfile ep5 = createProfile(employeeProfileRepository, c5, "0661000005", deptDSI, List.of("Java", "Spring Boot", "Docker", "Kubernetes"));
         EmployeeProfile ep6 = createProfile(employeeProfileRepository, c6, "0661000006", deptQA, List.of("Selenium", "JUnit", "Postman", "Cypress"));
-        EmployeeProfile ep7 = createProfile(employeeProfileRepository, c7, "0661000007", deptDevOps, List.of("Docker", "Kubernetes", "Jenkins", "AWS"));
+        EmployeeProfile ep7 = createProfile(employeeProfileRepository, c7, "0661000007", deptProdOps, List.of("Docker", "Kubernetes", "Jenkins", "AWS"));
         EmployeeProfile ep8 = createProfile(employeeProfileRepository, c8, "0661000008", deptDesign, List.of("Figma", "Adobe XD", "CSS", "UX/UI"));
 
         // ─── 4 Projets ───────────────────────────────────────

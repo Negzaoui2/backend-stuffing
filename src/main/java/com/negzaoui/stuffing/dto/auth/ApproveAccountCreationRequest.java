@@ -26,5 +26,11 @@ public class ApproveAccountCreationRequest {
      * Utilisé uniquement quand role = COLLABORATEUR.
      */
     private Long managerId;
+
+    /**
+     * Optionnel: ID du département auquel rattacher l'utilisateur.
+     * Utilisé pour role = COLLABORATEUR et role = DELIVERY_MANAGER.
+     */
+    private Long departementId;
 }
 

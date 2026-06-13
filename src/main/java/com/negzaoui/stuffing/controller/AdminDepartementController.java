@@ -1,6 +1,7 @@
 package com.negzaoui.stuffing.controller;
 
 import com.negzaoui.stuffing.dto.MessageResponse;
+import com.negzaoui.stuffing.dto.admin.CollaborateurDto;
 import com.negzaoui.stuffing.dto.admin.CreateDepartementRequest;
 import com.negzaoui.stuffing.dto.admin.DepartementDto;
 import com.negzaoui.stuffing.service.DepartementService;
@@ -33,6 +34,12 @@ public class AdminDepartementController {
     @GetMapping("/{id}")
     public ResponseEntity<DepartementDto> getById(@PathVariable Long id) {
         return ResponseEntity.ok(departementService.getDepartementById(id));
+    }
+
+    @Operation(summary = "Lister les collaborateurs rattachés à un département")
+    @GetMapping("/{id}/collaborateurs")
+    public ResponseEntity<List<CollaborateurDto>> getCollaborateurs(@PathVariable Long id) {
+        return ResponseEntity.ok(departementService.getCollaborateursByDepartement(id));
     }
 
     @Operation(summary = "Créer un nouveau département")

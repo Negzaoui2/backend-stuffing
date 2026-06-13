@@ -3,6 +3,7 @@ package com.negzaoui.stuffing.service;
 import com.negzaoui.stuffing.dto.auth.AccountCreationRequestDto;
 import com.negzaoui.stuffing.entity.*;
 import com.negzaoui.stuffing.repository.AccountCreationRequestRepository;
+import com.negzaoui.stuffing.repository.DepartementRepository;
 import com.negzaoui.stuffing.repository.EmployeeProfileRepository;
 import com.negzaoui.stuffing.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AccountCreationRequestService {
     private final AccountCreationRequestRepository requestRepository;
     private final UserRepository userRepository;
     private final EmployeeProfileRepository employeeProfileRepository;
+    private final DepartementRepository departementRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final NotificationService notificationService;
@@ -86,7 +88,7 @@ public class AccountCreationRequestService {
      * et envoie un email avec les credentials temporaires.
      */
     @Transactional
-    public User approve(Long requestId, Role role, String temporaryPassword, Long managerId, Authentication processedBy) {
+    public User approve(Long requestId, Role role, String temporaryPassword, Long managerId, Long departementId, Authentication processedBy) {
         var req = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Demande introuvable"));
 
@@ -159,7 +161,7 @@ public class AccountCreationRequestService {
                 user.getEmail(), professionalEmail, personalEmail, keycloakId);
 
         // ═══════════════════════════════════════════════════════
-        // 2b. Créer un EmployeeProfile vide pour le nouveau user
+        // 2b. Créer un EmployeeProfile pour le nouveau user
         // ═══════════════════════════════════════════════════════
         User assignedManager = null;
         if (managerId != null && role == Role.COLLABORATEUR) {
@@ -171,15 +173,25 @@ public class AccountCreationRequestService {
             }
         }
 
+        // Rattachement au département (valable pour COLLABORATEUR et DELIVERY_MANAGER)
+        Departement assignedDepartement = null;
+        if (departementId != null) {
+            assignedDepartement = departementRepository.findById(departementId).orElse(null);
+            if (assignedDepartement == null) {
+                log.warn("⚠️  departementId={} introuvable. Ignoré.", departementId);
+            }
+        }
+
         EmployeeProfile profile = EmployeeProfile.builder()
                 .user(user)
                 .phone(req.getPhone())
-                .departement(null)
+                .departement(assignedDepartement)
                 .manager(assignedManager)
                 .build();
         employeeProfileRepository.save(profile);
-        log.info("✅ EmployeeProfile créé pour {} (manager={})", professionalEmail,
-                assignedManager != null ? assignedManager.getEmail() : "aucun");
+        log.info("✅ EmployeeProfile créé pour {} (manager={}, departement={})", professionalEmail,
+                assignedManager != null ? assignedManager.getEmail() : "aucun",
+                assignedDepartement != null ? assignedDepartement.getName() : "aucun");
 
         // ═══════════════════════════════════════════════════════
         // 3. Mettre à jour la demande
