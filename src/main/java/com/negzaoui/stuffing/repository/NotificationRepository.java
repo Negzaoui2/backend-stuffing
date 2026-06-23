@@ -23,6 +23,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /** Notifications globales non lues (sans cible, broadcast) */
     List<Notification> findByTargetUserIsNullAndIsReadFalseOrderByCreatedAtDesc();
 
+    /** Vérifie si une notification d'un type donné existe déjà pour une affectation (anti-doublon scheduler) */
+    boolean existsByAssignmentIdAndType(Long assignmentId, String type);
+
     /** Ancienne méthode (gardée pour compatibilité) */
     List<Notification> findByIsReadFalse();
 

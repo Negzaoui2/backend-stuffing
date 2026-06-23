@@ -25,6 +25,10 @@ public class Notification {
     @Column(nullable = false)
     private String type;
 
+    /** Affectation liée (optionnel) — sert notamment à éviter les notifications en double côté scheduler. */
+    @Column(name = "assignment_id")
+    private Long assignmentId;
+
     /** Utilisateur cible de la notification (ex: l'ADMIN qui doit voir la demande). Null = broadcast. */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "target_user_id")

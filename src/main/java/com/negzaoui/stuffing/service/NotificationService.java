@@ -39,6 +39,22 @@ public class NotificationService {
     }
 
     /**
+     * Crée une notification ciblée liée à une affectation précise.
+     */
+    public Notification createNotification(String message, String type, User targetUser, Long assignmentId) {
+        Notification notification = Notification.builder()
+                .message(message)
+                .type(type)
+                .targetUser(targetUser)
+                .assignmentId(assignmentId)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        return notificationRepository.save(notification);
+    }
+
+    /**
      * Crée une notification pour TOUS les ADMIN (ex: nouvelle demande de compte).
      */
     @Transactional
