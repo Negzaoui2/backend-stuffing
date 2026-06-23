@@ -171,6 +171,39 @@ public class CollaboratorService {
         return toAssignmentDto(a);
     }
 
+    /**
+     * Le collaborateur marque lui-même son affectation comme terminée.
+     * Met le statut à COMPLETED et notifie son manager.
+     */
+    @Transactional
+    public CollaboratorAssignmentDetailDto completeAssignment(Long userId, Long assignmentId) {
+        User user = getUser(userId);
+        EmployeeProfile profile = getProfile(userId);
+
+        Assignment a = profile.getAssignments().stream()
+                .filter(as -> as.getId().equals(assignmentId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Affectation introuvable (id=" + assignmentId + ")"));
+
+        if (a.getStatus() == AssignmentStatus.COMPLETED) {
+            throw new IllegalStateException("Cette affectation est déjà terminée");
+        }
+
+        a.setStatus(AssignmentStatus.COMPLETED);
+        assignmentRepository.save(a);
+
+        // Notifier le manager du collaborateur
+        User manager = profile.getManager();
+        if (manager != null) {
+            String message = String.format(
+                    "%s %s a marqué sa tâche '%s' comme terminée",
+                    user.getFirstName(), user.getLastName(), a.getProjectName());
+            notificationService.createNotification(message, "ASSIGNMENT_COMPLETED", manager);
+        }
+
+        return toAssignmentDto(a);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  3. CALENDAR
     // ═══════════════════════════════════════════════════════════

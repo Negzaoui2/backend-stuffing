@@ -66,6 +66,16 @@ public class CollaboratorController {
         return ResponseEntity.ok(collaboratorService.getAssignmentDetail(userId, id));
     }
 
+    @Operation(summary = "Marquer une affectation comme terminee (notifie le manager)")
+    @PostMapping("/assignments/{id}/complete")
+    public ResponseEntity<CollaboratorAssignmentDetailDto> completeAssignment(
+            Authentication auth,
+            @PathVariable Long id
+    ) {
+        Long userId = keycloakHelper.getCurrentUserId(auth);
+        return ResponseEntity.ok(collaboratorService.completeAssignment(userId, id));
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  3. CALENDAR (FullCalendar)
     // ═══════════════════════════════════════════════════════════
