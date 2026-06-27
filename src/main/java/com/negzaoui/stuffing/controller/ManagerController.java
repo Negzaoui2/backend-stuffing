@@ -131,6 +131,14 @@ public class ManagerController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Supprimer (archiver) un projet : statut ARCHIVED + cloture des assignments actifs")
+    @DeleteMapping("/projects/{id}")
+    public ResponseEntity<Void> deleteProject(Authentication auth, @PathVariable Long id) {
+        Long managerId = keycloakHelper.getCurrentUserId(auth);
+        managerService.archiveProject(managerId, id);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Assigner un collaborateur à un projet")
     @PostMapping("/projects/{projectId}/assignments")
     public ResponseEntity<Void> assignCollaborator(Authentication auth, @PathVariable Long projectId, @Valid @RequestBody AssignCollaboratorRequest req) {

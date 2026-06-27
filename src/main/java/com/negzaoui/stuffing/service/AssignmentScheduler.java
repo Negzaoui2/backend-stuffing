@@ -30,8 +30,10 @@ import java.util.List;
 public class AssignmentScheduler {
 
     private static final int SOON_AVAILABLE_DAYS = 7;
+    private static final int ENDING_REMINDER_DAYS = 3;
     private static final String TYPE_OVERDUE = "ASSIGNMENT_OVERDUE";
     private static final String TYPE_SOON_AVAILABLE = "COLLABORATOR_SOON_AVAILABLE";
+    private static final String TYPE_ENDING_SOON = "ASSIGNMENT_ENDING_SOON";
 
     private final AssignmentRepository assignmentRepository;
     private final NotificationRepository notificationRepository;
@@ -46,6 +48,7 @@ public class AssignmentScheduler {
 
         notifyOverdueAssignments(today);
         notifySoonAvailableCollaborators(today);
+        notifyCollaboratorsEndingSoon(today);
 
         log.info("AssignmentScheduler: vérifications quotidiennes terminées");
     }
@@ -84,6 +87,26 @@ public class AssignmentScheduler {
                     "%s sera bientôt disponible (fin de mission '%s' le %s)",
                     collaboratorName(a), a.getProjectName(), a.getEndDate());
             notificationService.createNotification(message, TYPE_SOON_AVAILABLE, manager, a.getId());
+        }
+    }
+
+    private void notifyCollaboratorsEndingSoon(LocalDate today) {
+        LocalDate target = today.plusDays(ENDING_REMINDER_DAYS);
+        List<Assignment> ending =
+                assignmentRepository.findByStatusAndEndDateBetween(AssignmentStatus.ACTIVE, target, target);
+
+        for (Assignment a : ending) {
+            if (notificationRepository.existsByAssignmentIdAndType(a.getId(), TYPE_ENDING_SOON)) {
+                continue;
+            }
+            EmployeeProfile profile = a.getEmployeeProfile();
+            User collaborator = profile != null ? profile.getUser() : null;
+            if (collaborator == null) continue;
+
+            String message = String.format(
+                    "Votre tâche '%s' se termine dans %d jours (le %s)",
+                    a.getProjectName(), ENDING_REMINDER_DAYS, a.getEndDate());
+            notificationService.createNotification(message, TYPE_ENDING_SOON, collaborator, a.getId());
         }
     }
 

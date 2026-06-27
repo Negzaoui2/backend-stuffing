@@ -190,6 +190,9 @@ public class ManagerService {
                     ProjectStatus ps = ProjectStatus.valueOf(status);
                     predicates.add(cb.equal(root.get("status"), ps));
                 } catch (IllegalArgumentException ignored) {}
+            } else {
+                // Par defaut on masque les projets archives (suppression douce)
+                predicates.add(cb.notEqual(root.get("status"), ProjectStatus.ARCHIVED));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -503,6 +506,7 @@ public class ManagerService {
             case PLANNED -> "#FF9800";           // Orange
             case ON_HOLD -> "#F44336";           // Rouge
             case COMPLETED -> "#9E9E9E";         // Gris
+            case ARCHIVED -> "#616161";          // Gris fonce
         };
     }
 
@@ -618,6 +622,36 @@ public class ManagerService {
             throw new SecurityException("Ce projet ne vous appartient pas");
         }
         project.setStatus(ProjectStatus.valueOf(newStatus));
+        projectRepository.save(project);
+    }
+
+    /**
+     * Suppression douce : marque le projet comme ARCHIVED et clot tous les
+     * assignments encore ACTIFS sur ce projet. Les donnees historiques
+     * (rapports, calendrier passe) restent disponibles.
+     */
+    @Transactional
+    public void archiveProject(Long managerId, Long projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Projet introuvable"));
+        if (!project.getManager().getId().equals(managerId)) {
+            throw new SecurityException("Ce projet ne vous appartient pas");
+        }
+        if (project.getStatus() == ProjectStatus.ARCHIVED) {
+            throw new IllegalStateException("Ce projet est deja archive");
+        }
+
+        LocalDate today = LocalDate.now();
+        for (Assignment a : project.getAssignments()) {
+            if (a.getStatus() == AssignmentStatus.ACTIVE) {
+                a.setStatus(AssignmentStatus.COMPLETED);
+                if (a.getEndDate() == null || a.getEndDate().isAfter(today)) {
+                    a.setEndDate(today);
+                }
+            }
+        }
+
+        project.setStatus(ProjectStatus.ARCHIVED);
         projectRepository.save(project);
     }
 

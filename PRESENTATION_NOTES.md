@@ -51,6 +51,8 @@
 - ✅ KPIs & rapports (taux d'occupation, absentéisme, distribution compétences)
 - ✅ Chatbot IA pour aide à la décision staffing
 - ✅ Notifications temps réel in-app
+- ✅ Authentification sécurisée via SSO (Keycloak)
+- ✅ partie Analytics pour le manager 
 
 ---
 

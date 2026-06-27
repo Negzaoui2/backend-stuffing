@@ -424,8 +424,15 @@ public class CollaboratorService {
         profile.getSkills().clear();
         employeeProfileRepository.saveAndFlush(profile);
 
+        // Déduplication des noms (après normalisation) pour éviter "java" + "Java" en double
+        java.util.Set<String> alreadyAdded = new java.util.HashSet<>();
+
         // Add new skills
         for (SkillDto dto : req.getSkills()) {
+            String normalizedName = com.negzaoui.stuffing.util.SkillNameNormalizer.normalize(dto.getName());
+            if (normalizedName == null) continue;             // nom vide ou null → ignoré
+            if (!alreadyAdded.add(normalizedName)) continue;  // doublon dans la requête → ignoré
+
             SkillLevel level;
             try {
                 level = dto.getLevel() != null ? SkillLevel.valueOf(dto.getLevel().toUpperCase()) : SkillLevel.INTERMEDIATE;
@@ -434,7 +441,7 @@ public class CollaboratorService {
             }
 
             Skill skill = Skill.builder()
-                    .name(dto.getName())
+                    .name(normalizedName)
                     .level(level)
                     .employeeProfile(profile)
                     .build();
@@ -448,7 +455,9 @@ public class CollaboratorService {
     @Transactional(readOnly = true)
     public List<String> suggestSkills(String query) {
         if (query == null || query.isBlank()) return List.of();
-        return skillRepository.findDistinctNamesByQuery(query);
+        // On normalise aussi la query : si l'utilisateur tape "reactjs", on cherche les "React" existants.
+        String normalized = com.negzaoui.stuffing.util.SkillNameNormalizer.normalize(query);
+        return skillRepository.findDistinctNamesByQuery(normalized != null ? normalized : query);
     }
 
     // ═══════════════════════════════════════════════════════════

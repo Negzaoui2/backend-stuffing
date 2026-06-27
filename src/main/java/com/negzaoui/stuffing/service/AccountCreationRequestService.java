@@ -1,6 +1,7 @@
 package com.negzaoui.stuffing.service;
 
 import com.negzaoui.stuffing.dto.auth.AccountCreationRequestDto;
+import com.negzaoui.stuffing.dto.auth.AccountRequestStatsDto;
 import com.negzaoui.stuffing.entity.*;
 import com.negzaoui.stuffing.repository.AccountCreationRequestRepository;
 import com.negzaoui.stuffing.repository.DepartementRepository;
@@ -38,15 +39,13 @@ public class AccountCreationRequestService {
     private String frontendUrl;
 
     /**
-     * Soumission d'une nouvelle demande (si une PENDING existe déjà pour le même email, on évite un doublon).
+     * Soumission d'une nouvelle demande.
+     * Les doublons (même email avec une demande PENDING existante) sont autorisés :
+     * chaque soumission est enregistrée pour que l'admin voie toutes les tentatives.
      */
     @Transactional
     public void submit(AccountCreationRequestDto dto) {
         Objects.requireNonNull(dto, "dto must not be null");
-        if (requestRepository.existsByEmailAndStatus(dto.getEmail(), AccountRequestStatus.PENDING)) {
-            // On ne crée pas de doublon de demande en attente
-            return;
-        }
 
         var req = AccountCreationRequest.builder()
                 .lastName(dto.getLastName())
@@ -81,6 +80,23 @@ public class AccountCreationRequestService {
             return requestRepository.findAllByOrderByCreatedAtDesc(pageable);
         }
         return requestRepository.findAllByStatusOrderByCreatedAtDesc(status, pageable);
+    }
+
+    /**
+     * STATS : compte exact des demandes par statut (utilise countByStatus côté repo).
+     * Source unique de vérité pour les compteurs affichés dans le dashboard admin.
+     */
+    @Transactional(readOnly = true)
+    public AccountRequestStatsDto stats() {
+        long pending = requestRepository.countByStatus(AccountRequestStatus.PENDING);
+        long approved = requestRepository.countByStatus(AccountRequestStatus.APPROVED);
+        long rejected = requestRepository.countByStatus(AccountRequestStatus.REJECTED);
+        return AccountRequestStatsDto.builder()
+                .total(pending + approved + rejected)
+                .pending(pending)
+                .approved(approved)
+                .rejected(rejected)
+                .build();
     }
 
     /**

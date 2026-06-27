@@ -1,6 +1,7 @@
 package com.negzaoui.stuffing.controller;
 
 import com.negzaoui.stuffing.dto.MessageResponse;
+import com.negzaoui.stuffing.dto.auth.AccountRequestStatsDto;
 import com.negzaoui.stuffing.dto.auth.ApproveAccountCreationRequest;
 import com.negzaoui.stuffing.dto.auth.RejectAccountCreationRequest;
 import com.negzaoui.stuffing.entity.AccountCreationRequest;
@@ -42,6 +43,13 @@ public class HrAccountRequestsController {
     ) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(service.list(status, pageable));
+    }
+
+    @Operation(summary = "Statistiques des demandes (total, pending, approved, rejected)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/account-requests/stats")
+    public ResponseEntity<AccountRequestStatsDto> stats() {
+        return ResponseEntity.ok(service.stats());
     }
 
     @Operation(summary = "Approuver une demande et créer le compte")

@@ -524,3 +524,34 @@ spring.mail.password=${GMAIL_APP_PASSWORD}
 
 **📅 Document généré automatiquement le 2026-05-18**
 
+---
+
+## 🔔 Notifications & Calendrier — Gestion des affectations
+
+### Étape 1 — Clôture manuelle par le collaborateur (commit d2fd121)
+On a permis au collaborateur de marquer lui-même son affectation comme terminée. Quand il le fait, son manager reçoit automatiquement une notification de type ASSIGNMENT_COMPLETED.
+
+Fichiers modifiés :
+- controller/CollaboratorController.java : ajout de l'endpoint POST /api/collaborator/assignments/{id}/complete
+- service/CollaboratorService.java : ajout de la méthode completeAssignment() qui passe le statut en COMPLETED et notifie le manager
+
+### Étape 2 — Notifications automatiques (scheduler) (commit a6073d3)
+On a ajouté une tâche planifiée qui tourne tous les jours à 06h00 et qui notifie les managers : quand une tâche a dépassé sa date de fin mais est encore active (ASSIGNMENT_OVERDUE), et quand un collaborateur sera bientôt disponible, fin dans 7 jours (COLLABORATOR_SOON_AVAILABLE). On a aussi ajouté un champ assignmentId sur les notifications pour éviter d'envoyer plusieurs fois la même notif.
+
+Fichiers modifiés :
+- StuffingApplication.java : ajout de @EnableScheduling
+- entity/Notification.java : ajout du champ assignmentId
+- repository/AssignmentRepository.java : ajout des requêtes findByStatusAndEndDateBefore et findByStatusAndEndDateBetween
+- repository/NotificationRepository.java : ajout de existsByAssignmentIdAndType
+- service/NotificationService.java : ajout d'une surcharge createNotification avec assignmentId
+- service/AssignmentScheduler.java : nouveau fichier contenant la logique du scheduler
+
+### Étape 3a — Rappel au collaborateur (pas encore commité)
+On a ajouté une troisième vérification dans le scheduler qui prévient le collaborateur quand sa tâche se termine dans 3 jours (ASSIGNMENT_ENDING_SOON).
+
+Fichier modifié :
+- service/AssignmentScheduler.java : ajout de la méthode notifyCollaboratorsEndingSoon()
+
+### Note sur le calendrier
+La partie calendrier (CalendarEventDto et getCalendarEvents) n'a pas été modifiée, elle existait déjà et affiche automatiquement les tâches terminées en gris grâce au statut COMPLETED.
+
